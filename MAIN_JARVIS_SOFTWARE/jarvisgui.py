@@ -1076,8 +1076,8 @@ class IronManHUD(QMainWindow):
         input_layout.setContentsMargins(10, 5, 10, 5)
         
         # Voice Button
-        self.voice_btn = QPushButton("🎤")
-        self.voice_btn.setFixedSize(40, 40)
+        self.voice_btn = QPushButton("Voice")
+        self.voice_btn.setFixedSize(50, 40)
         self.voice_btn.setCheckable(True)
         self.voice_btn.setChecked(True)
         self.voice_btn.setStyleSheet("""
@@ -1086,8 +1086,8 @@ class IronManHUD(QMainWindow):
                     stop:0 rgba(0, 200, 100, 200),
                     stop:1 rgba(0, 100, 50, 150));
                 border: 2px solid #00FF80;
-                border-radius: 20px;
-                font-size: 16px;
+                border-radius: 5px;
+                font-size: 12px;
             }
             QPushButton:checked {
                 background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
@@ -1121,8 +1121,8 @@ class IronManHUD(QMainWindow):
         input_layout.addWidget(self.command_input, 1)
         
         # Send Button
-        send_btn = QPushButton("➤")
-        send_btn.setFixedSize(40, 40)
+        send_btn = QPushButton("Send")
+        send_btn.setFixedSize(50, 40)
         send_btn.setStyleSheet("""
             QPushButton {
                 background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
@@ -1189,18 +1189,18 @@ class IronManHUD(QMainWindow):
         actions_grid.setSpacing(10)
         
         actions = [
-            ("🌐", "Web", self.cmd_web),
-            ("📱", "Apps", self.cmd_apps),
-            ("💬", "Messages", self.cmd_message),
-            ("📞", "Call", self.cmd_call),
-            ("🎵", "Music", self.cmd_music),
-            ("📁", "Files", self.cmd_files),
-            ("⚙️", "Settings", self.cmd_settings),
-            ("🔒", "Lock", self.cmd_lock)
+            ("Web", self.cmd_web),
+            ("Apps", self.cmd_apps),
+            ("Messages", self.cmd_message),
+            ("Call", self.cmd_call),
+            ("Music", self.cmd_music),
+            ("Files", self.cmd_files),
+            ("Settings", self.cmd_settings),
+            ("Lock", self.cmd_lock)
         ]
         
-        for i, (icon, text, func) in enumerate(actions):
-            btn = QPushButton(f"{icon} {text}")
+        for i, (text, func) in enumerate(actions):
+            btn = QPushButton(f"{text}")
             btn.setMinimumHeight(40)
             btn.setStyleSheet("""
                 QPushButton {
@@ -1242,24 +1242,24 @@ class IronManHUD(QMainWindow):
         
         # Control buttons
         controls = [
-            ("🔄", "Refresh", self.refresh_system),
-            ("📊", "Stats", self.show_stats),
-            ("⚡", "Boost", self.boost_mode),
-            ("🛡️", "Security", self.security_mode),
-            ("🚀", "Launch", self.launch_app)
+            ("Refresh", "Refresh", self.refresh_system),
+            ("Stats", "Stats", self.show_stats),
+            ("Boost", "Boost", self.boost_mode),
+            ("Secure", "Security", self.security_mode),
+            ("Launch", "Launch", self.launch_app)
         ]
         
         for icon, tooltip, func in controls:
             btn = QPushButton(icon)
             btn.setToolTip(tooltip)
-            btn.setFixedSize(35, 35)
+            btn.setFixedSize(70, 35)
             btn.setStyleSheet("""
                 QPushButton {
                     background: rgba(0, 50, 100, 150);
                     border: 1px solid rgba(0, 150, 255, 80);
-                    border-radius: 17px;
+                    border-radius: 5px;
                     color: #00FFFF;
-                    font-size: 14px;
+                    font-size: 12px;
                 }
                 QPushButton:hover {
                     background: rgba(0, 100, 200, 200);
@@ -1279,7 +1279,7 @@ class IronManHUD(QMainWindow):
             QPushButton {
                 background: rgba(200, 50, 50, 150);
                 border: 1px solid rgba(255, 100, 100, 100);
-                border-radius: 17px;
+                border-radius: 5px;
                 color: #FFFFFF;
                 font-size: 14px;
                 font-weight: bold;
@@ -1373,6 +1373,18 @@ class IronManHUD(QMainWindow):
                 else:
                     self.handle_state_change("ONLINE")
     
+    def _append_html_to_chat(self, html):
+        """Append HTML to the END of chat display, ensuring sequential order."""
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.End)
+        self.chat_display.setTextCursor(cursor)
+        self.chat_display.insertHtml(html)
+        # Add a newline after the inserted block for separation
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.End)
+        cursor.insertText("\n")
+        self.scroll_chat()
+    
     def handle_hotword(self):
         """Handle hotword detection"""
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1382,8 +1394,7 @@ class IronManHUD(QMainWindow):
             <span style='color: #FFFF00;'>Hotword detected, listening for command...</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
-        self.scroll_chat()
+        self._append_html_to_chat(html)
     
     def handle_voice_command(self, command):
         """Handle voice command"""
@@ -1395,9 +1406,8 @@ class IronManHUD(QMainWindow):
             <span style='color: #FFFFFF;'>{command}</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
+        self._append_html_to_chat(html)
         self.command_input.setText(command)
-        self.scroll_chat()
     
     def handle_response(self, response):
         """Handle JARVIS response"""
@@ -1412,8 +1422,7 @@ class IronManHUD(QMainWindow):
             <span style='color: #FFFFFF;'>{response}</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
-        self.scroll_chat()
+        self._append_html_to_chat(html)
     
     def handle_error(self, error):
         """Handle error"""
@@ -1425,8 +1434,7 @@ class IronManHUD(QMainWindow):
             <span style='color: #FFFFFF;'>{error}</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
-        self.scroll_chat()
+        self._append_html_to_chat(html)
     
     def send_command(self):
         """Send command to JARVIS"""
@@ -1445,12 +1453,10 @@ class IronManHUD(QMainWindow):
             <span style='color: #FFFFFF;'>{command}</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
+        self._append_html_to_chat(html)
         
         # Send to backend
         self.backend.send_command(command)
-        
-        self.scroll_chat()
     
     def toggle_voice(self):
         """Toggle voice listening"""
@@ -1592,15 +1598,21 @@ class IronManHUD(QMainWindow):
     def add_chat_message(self, sender, message, color):
         """Helper to add chat messages"""
         timestamp = datetime.now().strftime("%H:%M:%S")
+        # Convert hex color to RGB for background rgba()
+        try:
+            r = int(color[1:3], 16)
+            g = int(color[3:5], 16)
+            b = int(color[5:7], 16)
+        except (ValueError, IndexError):
+            r, g, b = 0, 150, 255
         html = f"""
-        <div style='margin: 5px 0; padding: 5px; background: rgba({color[1:3]}, {color[3:5]}, {color[5:7]}, 0.1); border-radius: 3px;'>
+        <div style='margin: 5px 0; padding: 5px; background: rgba({r}, {g}, {b}, 0.1); border-radius: 3px;'>
             <span style='color: #AAAAAA; font-size: 9px;'>[{timestamp}]</span>
             <span style='color: {color};'>{sender}:</span>
             <span style='color: #FFFFFF;'>{message}</span>
         </div>
         """
-        self.chat_display.insertHtml(html)
-        self.scroll_chat()
+        self._append_html_to_chat(html)
     
     def closeEvent(self, event):
         """Handle window close"""
@@ -1853,7 +1865,7 @@ if __name__ == "__main__":
         logger.error(f"Fatal error: {e}", exc_info=True)
         print(f"\n❌ Error: {e}")
         print("Please check the log file: jarvis_ultimate.log")
-        
+         
         # Try to show error in message box
         try:
             error_box = QMessageBox()

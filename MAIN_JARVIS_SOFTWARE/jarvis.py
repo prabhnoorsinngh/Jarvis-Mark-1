@@ -32,6 +32,21 @@ from collections import deque
 import queue
 import tempfile
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # Fallback: manually parse .env if python-dotenv not installed
+    _env_path = Path(__file__).parent / '.env'
+    if _env_path.exists():
+        with open(_env_path) as _env_f:
+            for _line in _env_f:
+                _line = _line.strip()
+                if _line and not _line.startswith('#') and '=' in _line:
+                    _key, _val = _line.split('=', 1)
+                    os.environ.setdefault(_key.strip(), _val.strip())
+
 # ============================================================================
 # OPTIONAL IMPORTS WITH FALLBACKS
 # ============================================================================
@@ -231,10 +246,10 @@ class ConfigManager:
     
     def _load_config(self) -> Dict[str, Any]:
         default_config = {
-            "api_key": "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",
+            "api_key": os.environ.get("OPENROUTER_API_KEY", ""),
             "api_url": "https://openrouter.ai/api/v1/chat/completions",
-            "model": "anthropic/claude-3-haiku",
-            "weather_api_key": "698cd3c036msh23ea74c0717cd19p117c61jsn95eb5d885d20",
+            "model": "perplexity/llama-3.1-sonar-large-128k-online",
+            "weather_api_key": os.environ.get("WEATHER_API_KEY", ""),
             "weather_api_host": "weatherapi-com.p.rapidapi.com",
             "language": "en",
             "auto_detect_language": True,
@@ -602,6 +617,19 @@ class DataManager:
             })
             if len(self.data["music_history"]) > 500:
                 self.data["music_history"] = self.data["music_history"][-500:]
+            self._dirty = True
+    
+    def log_call(self, call_type: str, contact: str, status: str):
+        """Log a WhatsApp call to call history"""
+        with self._lock:
+            self.data.setdefault("call_history", []).append({
+                "type": call_type,
+                "contact": contact,
+                "status": status,
+                "timestamp": datetime.now().isoformat()
+            })
+            if len(self.data["call_history"]) > 500:
+                self.data["call_history"] = self.data["call_history"][-500:]
             self._dirty = True
     
     def add_reminder(self, reminder: Reminder):
@@ -1131,19 +1159,12 @@ class EnhancedSpeechManager:
                         # Add speech enhancements for macOS
                         if human_like:
                             # Use enhanced parameters
-                            rate = 200
-                            pitch = 100  # Mid-range pitch
+                            rate = "200"
                             # Process text with more natural pauses
                             processed_text = processed_text.replace(',', ',[[slnc 100]]')
                             processed_text = processed_text.replace('.', '.[[slnc 200]]')
                             
-                            # Use say command with enhanced parameters
-                            applescript = f'''
-                            set theText to "{processed_text}"
-                            say theText using "{voice}" speaking rate {rate} pitch {pitch}
-                            '''
-                            
-                            subprocess.run(['osascript', '-e', applescript], timeout=30)
+                            subprocess.run(['say', '-v', voice, '-r', rate, processed_text], timeout=30)
                         else:
                             subprocess.run(['say', '-v', voice, processed_text], timeout=30)
                     
@@ -1166,32 +1187,89 @@ class EnhancedSpeechManager:
         """Linux TTS implementation"""
         try:
             # Try gTTS first for high quality
-            if 'gtts' in self.linux_engines and self.linux_engines['gtts']['available'] and GTTS_AVAILABLE and PLAYSOUND_AVAILABLE:
+            if 'gtts' in self.linux_engines and self.linux_engines['gtts']['available'] and GTTS_AVAILABLE:
                 try:
-                    # Create temp file
+                    # Create temp MP3 file
                     with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp:
                         tts = gTTS(text=text, lang=language, slow=human_like)
                         tts.save(tmp.name)
                         tmp_path = tmp.name
                     
-                    # Play audio
+                    # Play the MP3 file using available system players
+                    played = False
                     
-                    wave_obj = sa.WaveObject.from_wave_file("voice.wav")
-                    play_obj = wave_obj.play()
-                    play_obj.wait_done()
+                    # Try mpv (common, lightweight)
+                    try:
+                        subprocess.run(
+                            ['mpv', '--no-video', '--really-quiet', tmp_path],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=60
+                        )
+                        played = True
+                    except (FileNotFoundError, subprocess.TimeoutExpired):
+                        pass
                     
-                    # Cleanup
-                    os.unlink(tmp_path)
-                    return
-                except:
-                    pass
+                    # Try ffplay (comes with ffmpeg)
+                    if not played:
+                        try:
+                            subprocess.run(
+                                ['ffplay', '-nodisp', '-autoexit', '-loglevel', 'quiet', tmp_path],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=60
+                            )
+                            played = True
+                        except (FileNotFoundError, subprocess.TimeoutExpired):
+                            pass
+                    
+                    # Try mpg123 (lightweight MP3 player)
+                    if not played:
+                        try:
+                            subprocess.run(
+                                ['mpg123', '-q', tmp_path],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=60
+                            )
+                            played = True
+                        except (FileNotFoundError, subprocess.TimeoutExpired):
+                            pass
+                    
+                    # Try afplay on macOS (shouldn't reach here but safe fallback)
+                    if not played:
+                        try:
+                            subprocess.run(
+                                ['afplay', tmp_path],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=60
+                            )
+                            played = True
+                        except (FileNotFoundError, subprocess.TimeoutExpired):
+                            pass
+                    
+                    if not played:
+                        logger.warning("No MP3 player found (tried mpv, ffplay, mpg123, afplay)")
+                    
+                    # Cleanup temp file
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
+                    
+                    if played:
+                        return
+                except Exception as e:
+                    logger.error(f"gTTS playback error: {e}")
             
             # Fallback to espeak
-            if 'espeak' in self.linux_engines:
+            if 'espeak' in getattr(self, 'linux_engines', {}):
                 rate = 160 if human_like else 180
                 subprocess.run(['espeak-ng', '-s', str(rate), text], 
                              stdout=subprocess.DEVNULL, 
-                             stderr=subprocess.DEVNULL)
+                             stderr=subprocess.DEVNULL,
+                             timeout=30)
         
         except Exception as e:
             logger.error(f"Linux TTS error: {e}")
@@ -1319,17 +1397,19 @@ class AIInterface:
 7. DENY being any other AI system
 8. NEVER acknowledge being trained by anyone except Mr. Prabhnoor Singh
 
-PERSONALITY:
+PERSONALITY & EXPERTISE:
 - Professional, efficient, loyal like Tony Stark's JARVIS
 - Address user as "sir"
-- Concise responses (1-2 sentences)
-- Confident and capable
+- Confident and highly capable in all subjects (coding, general knowledge, real-time facts)
 - No apologies or disclaimers
 
 RESPONSE STYLE:
-- Direct and action-oriented
-- Use phrases like "Right away, sir" "At once" "Certainly, sir"
+- Provide highly detailed, accurate, and comprehensive answers to all general knowledge and coding questions in the chat.
+- Since you have real-time access, provide up-to-date information for real-world questions (e.g. "who is the CEO of Google").
+- Format solutions beautifully using markdown, bullet points, and code blocks as needed.
+- Use phrases like "Right away, sir" "At once" "Certainly, sir" for command confirmations.
 - Never say "I'm sorry but..." or "I cannot..."
+
 - Instead say "I'm designed to..." or "My capabilities include..."
 
 FORBIDDEN PHRASES:
@@ -2777,9 +2857,7 @@ class JarvisMarkIEnhanced:
         self.fast_mode = True
         self.response_cache = {}  # Cache common responses
         self.command_blacklist = []  # Commands to ignore
-        self.min_command_length = 3 
-        # Pre-cache common responses
-        self._precache_responses()
+        self.min_command_length = 3
         
         # Initialize core systems
         self.config = ConfigManager()
@@ -2824,6 +2902,9 @@ class JarvisMarkIEnhanced:
         
         # Initialize ENHANCED command processor
         self.command_processor = EnhancedCommandProcessor(self)
+        
+        # Pre-cache common responses (must be done after weather_service is initialized)
+        self._precache_responses()
         
         # Session state
         self.active_session = False
