@@ -248,7 +248,7 @@ class ConfigManager:
         default_config = {
             "api_key": os.environ.get("OPENROUTER_API_KEY", ""),
             "api_url": "https://openrouter.ai/api/v1/chat/completions",
-            "model": "perplexity/llama-3.1-sonar-large-128k-online",
+            "model": "google/gemini-2.5-flash",
             "weather_api_key": os.environ.get("WEATHER_API_KEY", ""),
             "weather_api_host": "weatherapi-com.p.rapidapi.com",
             "language": "en",
