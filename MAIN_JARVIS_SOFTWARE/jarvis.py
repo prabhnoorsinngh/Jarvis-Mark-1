@@ -1542,6 +1542,7 @@ class ApplicationController:
             if self.os_type == OSType.DARWIN:
                 app_mappings = {
                     'safari': 'Safari', 'chrome': 'Google Chrome', 'firefox': 'Firefox',
+                    'crome': 'Google Chrome', 'browser': 'Google Chrome',
                     'vscode': 'Visual Studio Code', 'code': 'Visual Studio Code',
                     'terminal': 'Terminal', 'finder': 'Finder', 'mail': 'Mail',
                     'notes': 'Notes', 'calendar': 'Calendar', 'music': 'Music',

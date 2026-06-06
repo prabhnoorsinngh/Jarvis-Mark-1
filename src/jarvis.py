@@ -620,6 +620,18 @@ class DataManager:
     def get_notes(self) -> List[Note]:
         return [Note(**n) for n in self.data.get("notes", [])]
     
+    def log_call(self, call_type: str, contact: str, status: str):
+        with self._lock:
+            self.data.setdefault("call_history", []).append({
+                "type": call_type,
+                "contact": contact,
+                "status": status,
+                "timestamp": datetime.now().isoformat()
+            })
+            if len(self.data["call_history"]) > 100:
+                self.data["call_history"] = self.data["call_history"][-100:]
+            self._dirty = True
+
     def shutdown(self):
         self._shutdown = True
         self.save(force=True)
@@ -1462,6 +1474,7 @@ class ApplicationController:
             if self.os_type == OSType.DARWIN:
                 app_mappings = {
                     'safari': 'Safari', 'chrome': 'Google Chrome', 'firefox': 'Firefox',
+                    'crome': 'Google Chrome', 'browser': 'Google Chrome',
                     'vscode': 'Visual Studio Code', 'code': 'Visual Studio Code',
                     'terminal': 'Terminal', 'finder': 'Finder', 'mail': 'Mail',
                     'notes': 'Notes', 'calendar': 'Calendar', 'music': 'Music',
